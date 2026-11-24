@@ -71,3 +71,12 @@ def test_runner_failure_becomes_ai_error():
         raise FileNotFoundError("claude")
     with pytest.raises(AiError):
         make_ask_json("m", run, log=lambda line: None)(system="s", user="u", schema=SCHEMA)
+
+
+def test_nonzero_exit_with_json_stdout_reports_its_result_text():
+    # 실제로 겪은 경우: 인증 실패 시 종료 코드 1과 함께 JSON이 나오고, 이유는 뒤쪽 result 칸에 있다.
+    out = json.dumps({"duration_api_ms": 0, "usage": {"x": "y" * 400}, "is_error": True,
+                      "result": "Invalid bearer token"})
+    ask = make_ask_json("m", runner(returncode=1, stdout=out), log=lambda line: None)
+    with pytest.raises(AiError, match="Invalid bearer token"):
+        ask(system="s", user="u", schema=SCHEMA)

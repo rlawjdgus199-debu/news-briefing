@@ -32,6 +32,17 @@ def run_cli(args: list[str], stdin_text: str) -> tuple[int, str, str]:
     return done.returncode, done.stdout.decode("utf-8", "replace"), done.stderr.decode("utf-8", "replace")
 
 
+def _failure_text(out: str, err: str) -> str:
+    """실패 이유를 한 줄로. 출력이 JSON이면 이유가 적힌 result 칸을 꺼낸다."""
+    try:
+        result = json.loads(out).get("result")
+        if result:
+            return str(result).strip()[:300]
+    except (ValueError, AttributeError):
+        pass
+    return (err or out).strip()[:300]
+
+
 def make_ask_json(model: str, run: Runner = run_cli, log: Callable[[str], None] = print) -> AskJson:
     def ask(*, system: str, user: str, schema: dict) -> dict:
         args = [
@@ -47,7 +58,7 @@ def make_ask_json(model: str, run: Runner = run_cli, log: Callable[[str], None] 
         except Exception as e:
             raise AiError(f"AI 호출 실패: {type(e).__name__}: {e}") from e
         if code != 0:
-            raise AiError(f"AI 호출 실패 (종료 코드 {code}): {(err or out).strip()[:300]}")
+            raise AiError(f"AI 호출 실패 (종료 코드 {code}): {_failure_text(out, err)}")
         try:
             result = json.loads(out)
         except ValueError as e:
