@@ -10,7 +10,7 @@ import subprocess
 from collections.abc import Callable
 from typing import Protocol
 
-TIMEOUT_SECONDS = 600
+TIMEOUT_SECONDS = 900  # 묶기 단계는 실제로 4분쯤 걸린다
 Runner = Callable[[list[str], str], tuple[int, str, str]]  # (인자들, 표준 입력) -> (종료 코드, 출력, 오류 출력)
 
 

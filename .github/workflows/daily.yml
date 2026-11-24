@@ -1,0 +1,42 @@
+name: daily-briefing
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # 매일 22:00 UTC = 한국 시간 07:00 (깃허브 사정으로 5~30분 늦을 수 있음)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency: daily-briefing
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # AI는 Claude Code를 구독 계정으로 불러서 쓴다 (API 요금 없음).
+      - run: npm install -g @anthropic-ai/claude-code
+
+      - run: python -m briefing
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Save archive and history
+        if: always()
+        run: |
+          git config user.name "news-briefing-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add archive state
+          git diff --cached --quiet || git commit -m "briefing: $(TZ=Asia/Seoul date +%F)"
+          git push
