@@ -1,0 +1,15 @@
+{
+  "model": "claude-haiku-5-5",
+  "window_hours": 24,
+  "general": { "min_outlets": 3, "min_regions": 2, "kr_min_outlets": 2, "max": 3 },
+  "econ": { "max": 10, "guaranteed_regions": ["CN", "JP", "EU"] },
+  "history_days": 7,
+  "markets": [
+    { "label": "코스피", "symbol": "^KS11", "unit": "index" },
+    { "label": "코스닥", "symbol": "^KQ11", "unit": "index" },
+    { "label": "나스닥", "symbol": "^IXIC", "unit": "index" },
+    { "label": "S&P500", "symbol": "^GSPC", "unit": "index" },
+    { "label": "원/달러", "symbol": "KRW=X", "unit": "krw" },
+    { "label": "미 10년물", "symbol": "^TNX", "unit": "pct" }
+  ]
+}
