@@ -186,3 +186,23 @@ def test_main_without_webhook_returns_1(monkeypatch, capsys):
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
     assert main([]) == 1
     assert "SLACK_WEBHOOK_URL" in capsys.readouterr().out
+
+
+def test_broken_config_sends_a_failure_notice(tmp_path, monkeypatch, capsys):
+    # 설정 파일을 잘못 고쳐도 아무 말 없이 멈추지 않고 슬랙으로 알린다.
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "settings.json").write_text("{not json", encoding="utf-8")
+    (tmp_path / "config" / "sources.json").write_text("[]", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SLACK_WEBHOOK_URL", "https://hooks.slack.com/services/x")
+    sent = []
+    monkeypatch.setattr("briefing.run.send_slack", lambda text, url: sent.append(text))
+    assert main([]) == 1
+    assert len(sent) == 1 and "브리핑 생성 실패" in sent[0] and "설정 파일" in sent[0]
+    assert "설정 파일" in capsys.readouterr().out
+
+
+def test_failure_reason_is_logged_as_well_as_sent(tmp_path):
+    h = Harness(tmp_path, failed=["cn1", "yna"])
+    h.go()
+    assert any("매체 4곳 중 2곳 수집 실패" in line for line in h.logs)

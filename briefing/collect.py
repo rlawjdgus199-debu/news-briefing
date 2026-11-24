@@ -66,7 +66,9 @@ def parse_feed(xml: str, outlet: Outlet) -> list[Article]:
     return articles
 
 
-def _collect_outlet(outlet: Outlet, settings: Settings, now: datetime, fetch_text: FetchText) -> list[Article]:
+def _collect_outlet(outlet: Outlet, settings: Settings, now: datetime,
+                    fetch_text: FetchText) -> tuple[list[Article], bool]:
+    """(최근 기사들, 피드에서 기사를 하나라도 읽었는가)를 돌려준다."""
     found: list[Article] = []
     for url in outlet.feeds:
         try:
@@ -88,7 +90,7 @@ def _collect_outlet(outlet: Outlet, settings: Settings, now: datetime, fetch_tex
         elif a.published_at >= cutoff:
             dated.append(a)
     dated.sort(key=lambda a: a.published_at, reverse=True)
-    return (dated + undated)[: outlet.max_items]
+    return (dated + undated)[: outlet.max_items], bool(found)
 
 
 def collect(outlets: list[Outlet], settings: Settings, now: datetime,
@@ -97,8 +99,9 @@ def collect(outlets: list[Outlet], settings: Settings, now: datetime,
         per_outlet = list(pool.map(lambda o: _collect_outlet(o, settings, now, fetch_text), outlets))
     articles: list[Article] = []
     failed: list[str] = []
-    for outlet, found in zip(outlets, per_outlet):
-        if not found:
+    for outlet, (found, readable) in zip(outlets, per_outlet):
+        # 피드를 못 읽었거나 비어 있으면 실패. 읽었는데 최근 기사가 없을 뿐이면(주말 등) 실패가 아니다.
+        if not readable:
             failed.append(outlet.id)
         for a in found:
             articles.append(replace(a, id=f"a{len(articles) + 1}"))

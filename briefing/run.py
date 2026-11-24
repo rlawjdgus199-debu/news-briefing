@@ -95,7 +95,9 @@ def run(deps: Deps) -> Literal["sent", "failed"]:
     except Exception as e:
         # 아무 말 없이 브리핑이 안 오는 일이 없도록, 실패했다는 사실을 알린다.
         known = isinstance(e, (BriefingError, AiError))
-        deliver(render_failure(today, str(e) if known else f"{type(e).__name__}: {e}"))
+        reason = str(e) if known else f"{type(e).__name__}: {e}"
+        deps.log(f"브리핑 생성 실패: {reason}")  # 슬랙 전송까지 실패해도 실행 기록에는 이유가 남는다
+        deliver(render_failure(today, reason))
         return "failed"
     deliver(render_slack(briefing))
     if not deps.dry_run:
@@ -115,9 +117,18 @@ def main(argv: list[str]) -> int:
         print("SLACK_WEBHOOK_URL 환경 변수가 필요합니다. 연습 실행은 --dry-run을 붙이세요.")
         return 1
 
-    settings = load_settings()
+    now = datetime.now(timezone.utc)
+    try:
+        settings, outlets = load_settings(), load_sources()
+    except Exception as e:
+        # 설정 파일을 잘못 고친 경우에도 아무 말 없이 멈추지 않는다.
+        reason = f"설정 파일 오류 ({type(e).__name__}): {str(e)[:300]}"
+        print(f"브리핑 생성 실패: {reason}")
+        if not args.dry_run:
+            send_slack(render_failure(now.astimezone(KST).strftime("%Y-%m-%d"), reason), webhook)
+        return 1
     deps = Deps(
-        now=datetime.now(timezone.utc), outlets=load_sources(), settings=settings,
+        now=now, outlets=outlets, settings=settings,
         collect=collect, ask=make_ask_json(settings.model), fetch_markets=fetch_markets,
         send=lambda text: send_slack(text, webhook),
         state_path="state/sent.json", archive_dir="archive",

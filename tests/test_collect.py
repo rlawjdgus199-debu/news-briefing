@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from briefing.collect import collect, parse_feed
@@ -95,3 +95,9 @@ def test_ids_run_a1_to_aN_across_outlets():
                 serve({"u1": fx("atom.xml"), "u2": fx("rdf-nodate.xml")}))
     assert [a.id for a in r.articles] == ["a1", "a2", "a3", "a4", "a5"]
     assert [a.outlet_id for a in r.articles] == ["p", "p", "q", "q", "q"]
+
+
+def test_outlet_with_only_old_articles_is_quiet_not_failed():
+    # 피드는 정상인데 최근 24시간 기사가 없는 매체(주말·공휴일)는 실패가 아니다.
+    r = collect([outlet()], SETTINGS, NOW + timedelta(days=7), serve({"u1": fx("rss.xml")}))
+    assert r.articles == [] and r.failed_outlet_ids == []

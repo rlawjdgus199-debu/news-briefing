@@ -13,7 +13,7 @@ concurrency: daily-briefing
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +25,8 @@ jobs:
       - run: pip install -r requirements.txt
 
       # AI는 Claude Code를 구독 계정으로 불러서 쓴다 (API 요금 없음).
-      - run: npm install -g @anthropic-ai/claude-code
+      # 버전을 고정한다: 새 버전에서 출력 형식이 바뀌면 브리핑이 깨질 수 있다.
+      - run: npm install -g @anthropic-ai/claude-code@2.1.331
 
       - run: python -m briefing
         env:
