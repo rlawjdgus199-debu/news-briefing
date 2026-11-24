@@ -9,24 +9,28 @@ from briefing.models import MarketQuote, MarketSpec
 CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1d"
 
 
+def _local_date(timestamp: int, gmtoffset: int) -> str:
+    """거래소 현지 날짜. 서울 장과 뉴욕 장은 같은 시각이라도 날짜가 다르다."""
+    return datetime.fromtimestamp(timestamp + gmtoffset, tz=timezone.utc).strftime("%Y-%m-%d")
+
+
 def parse_chart(text: str, spec: MarketSpec) -> MarketQuote:
     try:
         result = json.loads(text)["chart"]["result"][0]
+        meta = result["meta"]
+        price, price_time, offset = meta["regularMarketPrice"], meta["regularMarketTime"], meta["gmtoffset"]
         timestamps = result["timestamp"]
         closes = result["indicators"]["quote"][0]["close"]
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as e:
         raise ValueError(f"{spec.label}: 시세 응답 형식이 다릅니다") from e
-    points = [(t, c) for t, c in zip(timestamps, closes) if c is not None]
-    if len(points) < 2:
-        raise ValueError(f"{spec.label}: 종가가 2개 미만입니다")
-    (_, prev), (last_time, last) = points[-2], points[-1]
-    return MarketQuote(
-        label=spec.label,
-        unit=spec.unit,
-        value=last,
-        change_pct=(last - prev) / prev * 100,
-        date=datetime.fromtimestamp(last_time, tz=timezone.utc).strftime("%Y-%m-%d"),
-    )
+    # 장이 끝난 직후에는 마지막 날의 종가 칸이 비어 있고 최신가에만 값이 있는 경우가 있다.
+    # 그래서 값은 최신가를 쓰고, 그 전날까지의 마지막 종가와 비교한다.
+    day = _local_date(price_time, offset)
+    earlier = [c for t, c in zip(timestamps, closes) if c is not None and _local_date(t, offset) < day]
+    if price is None or not earlier:
+        raise ValueError(f"{spec.label}: 비교할 이전 종가가 없습니다")
+    return MarketQuote(label=spec.label, unit=spec.unit, value=price,
+                       change_pct=(price - earlier[-1]) / earlier[-1] * 100, date=day)
 
 
 def fetch_markets(specs: list[MarketSpec], fetch_text: FetchText = http_get_text) -> list[MarketQuote] | None:
